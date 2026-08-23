@@ -1,9 +1,0 @@
-{
-  "recommendations": [
-    "dbaeumer.vscode-eslint",
-    "bradlc.vscode-tailwindcss",
-    "esbenp.prettier-vscode",
-    "eamodio.gitlens",
-    "qwtel.sqlite-viewer"
-  ]
-}
