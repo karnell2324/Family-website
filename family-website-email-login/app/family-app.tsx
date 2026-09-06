@@ -29,12 +29,25 @@ type Post = {
   profiles: { full_name: string } | null;
 };
 
+type FamilyMember = {
+  id: number;
+  full_name: string;
+  relationship_label: string | null;
+  branch: string | null;
+  life_years: string | null;
+  bio: string | null;
+  photo_url: string | null;
+  parent_id: number | null;
+  generation: number;
+};
+
 const categories = ["news", "history", "photos", "learning", "events"];
 
 const sections = [
   ["home", "⌂", "Home"],
   ["news", "◈", "News"],
   ["history", "◷", "History"],
+  ["family-tree", "♧", "Family Tree"],
   ["photos", "▣", "Photos"],
   ["learning", "◇", "Learning"],
   ["events", "○", "Events"],
@@ -48,6 +61,7 @@ export default function FamilyApp() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [members, setMembers] = useState<Profile[]>([]);
   const [pendingPosts, setPendingPosts] = useState<Post[]>([]);
+  const [familyMembers, setFamilyMembers] = useState<FamilyMember[]>([]);
   const [view, setView] = useState("home");
   const [loading, setLoading] = useState(true);
   const [recovering, setRecovering] = useState(false);
@@ -75,6 +89,15 @@ export default function FamilyApp() {
       if (postsError) throw postsError;
 
       setPosts(approved || []);
+
+      const { data: tree, error: treeError } = await supabase
+        .from("family_members")
+        .select("*")
+        .order("generation")
+        .order("full_name");
+
+      if (treeError && treeError.code !== "42P01") throw treeError;
+      setFamilyMembers(tree || []);
 
       if (profileData.role === "admin") {
         const [
@@ -190,6 +213,54 @@ export default function FamilyApp() {
     await refresh();
   }
 
+  async function addFamilyMember(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setError("");
+
+    const form = event.currentTarget;
+    const values = Object.fromEntries(new FormData(form));
+    const parentId = String(values.parent_id || "");
+
+    const { error: insertError } = await supabase
+      .from("family_members")
+      .insert({
+        full_name: String(values.full_name).trim(),
+        relationship_label: String(values.relationship_label).trim() || null,
+        branch: String(values.branch).trim() || null,
+        life_years: String(values.life_years).trim() || null,
+        bio: String(values.bio).trim() || null,
+        photo_url: String(values.photo_url).trim() || null,
+        parent_id: parentId ? Number(parentId) : null,
+        generation: Number(values.generation),
+        created_by: user!.id,
+      });
+
+    if (insertError) {
+      setError(insertError.message);
+      return;
+    }
+
+    form.reset();
+    setMessage("Family member added to the tree.");
+    await refresh();
+  }
+
+  async function removeFamilyMember(id: number) {
+    setError("");
+    const { error: deleteError } = await supabase
+      .from("family_members")
+      .delete()
+      .eq("id", id);
+
+    if (deleteError) {
+      setError(deleteError.message);
+      return;
+    }
+
+    setMessage("Family member removed from the tree.");
+    await refresh();
+  }
+
   if (loading) {
     return <div className="loading">Opening the family website…</div>;
   }
@@ -299,11 +370,13 @@ export default function FamilyApp() {
                     ? "Approve accounts, review posts, and manage administrator roles."
                     : view === "submit"
                       ? "Share something meaningful with the family. Every post is reviewed before it appears."
-                      : `Approved ${heading.toLowerCase()} shared by our family.`}
+                      : view === "family-tree"
+                        ? "See how our generations and family branches connect, and preserve the people behind our story."
+                        : `Approved ${heading.toLowerCase()} shared by our family.`}
               </p>
             </div>
 
-            {view !== "submit" && (
+            {view !== "submit" && view !== "family-tree" && (
               <button
                 className="primary"
                 onClick={() => setView("submit")}
@@ -318,6 +391,13 @@ export default function FamilyApp() {
 
           {view === "submit" ? (
             <PostForm submit={submitPost} />
+          ) : view === "family-tree" ? (
+            <FamilyTree
+              members={familyMembers}
+              isAdmin={isAdmin}
+              addMember={addFamilyMember}
+              removeMember={removeFamilyMember}
+            />
           ) : view === "admin" && isAdmin ? (
             <Admin
               members={members}
@@ -335,6 +415,149 @@ export default function FamilyApp() {
           )}
         </main>
       </div>
+    </div>
+  );
+}
+
+function FamilyTree({
+  members,
+  isAdmin,
+  addMember,
+  removeMember,
+}: {
+  members: FamilyMember[];
+  isAdmin: boolean;
+  addMember: (event: FormEvent<HTMLFormElement>) => void;
+  removeMember: (id: number) => void;
+}) {
+  const generations = Array.from(
+    new Set(members.map((member) => member.generation)),
+  ).sort((a, b) => a - b);
+
+  return (
+    <div className="tree-layout">
+      <section className="panel tree-panel">
+        <div className="panel-head">
+          <div>
+            <p className="eyebrow">Our lineage</p>
+            <h2>Generations of family</h2>
+          </div>
+          <span className="pill">{members.length} people</span>
+        </div>
+
+        {members.length ? (
+          <div className="family-tree" aria-label="Family tree">
+            {generations.map((generation, index) => (
+              <section className="generation" key={generation}>
+                <div className="generation-label">
+                  <span>Generation {index + 1}</span>
+                </div>
+                <div className="generation-row">
+                  {members
+                    .filter((member) => member.generation === generation)
+                    .map((member) => {
+                      const parent = members.find(
+                        (candidate) => candidate.id === member.parent_id,
+                      );
+
+                      return (
+                        <article className="person-card" key={member.id}>
+                          <div className="person-photo">
+                            {member.photo_url ? (
+                              <img src={member.photo_url} alt="" />
+                            ) : (
+                              <span>{member.full_name.charAt(0)}</span>
+                            )}
+                          </div>
+                          <div className="person-copy">
+                            <h3>{member.full_name}</h3>
+                            {(member.relationship_label || member.life_years) && (
+                              <p className="person-detail">
+                                {[member.relationship_label, member.life_years]
+                                  .filter(Boolean)
+                                  .join(" · ")}
+                              </p>
+                            )}
+                            {parent && (
+                              <p className="parent-link">Child of {parent.full_name}</p>
+                            )}
+                            {member.branch && <span className="branch">{member.branch} branch</span>}
+                            {member.bio && <p className="person-bio">{member.bio}</p>}
+                          </div>
+                          {isAdmin && (
+                            <button
+                              className="remove-person"
+                              onClick={() => removeMember(member.id)}
+                              aria-label={`Remove ${member.full_name}`}
+                              title="Remove from tree"
+                            >
+                              ×
+                            </button>
+                          )}
+                        </article>
+                      );
+                    })}
+                </div>
+              </section>
+            ))}
+          </div>
+        ) : (
+          <div className="tree-empty">
+            <div className="tree-mark">♧</div>
+            <h3>Our tree starts here</h3>
+            <p>
+              {isAdmin
+                ? "Add the oldest known relative first, then connect each generation below them."
+                : "Karnell and Bahaiz are building the family tree. Check back as our story grows."}
+            </p>
+          </div>
+        )}
+      </section>
+
+      {isAdmin && (
+        <aside className="panel tree-form-panel">
+          <p className="eyebrow">Administrator tools</p>
+          <h2>Add a relative</h2>
+          <p className="help">Start with the oldest generation and work forward.</p>
+
+          <form className="form" onSubmit={addMember}>
+            <Field label="Full name *">
+              <input name="full_name" maxLength={100} required />
+            </Field>
+            <div className="form-pair">
+              <Field label="Generation *">
+                <input name="generation" type="number" min="1" max="20" defaultValue="1" required />
+              </Field>
+              <Field label="Family branch">
+                <input name="branch" maxLength={60} placeholder="Example: Holmes" />
+              </Field>
+            </div>
+            <Field label="Parent or direct ancestor">
+              <select name="parent_id" defaultValue="">
+                <option value="">No parent listed</option>
+                {members.map((member) => (
+                  <option key={member.id} value={member.id}>{member.full_name}</option>
+                ))}
+              </select>
+            </Field>
+            <div className="form-pair">
+              <Field label="Family role">
+                <input name="relationship_label" maxLength={60} placeholder="Grandmother, cousin…" />
+              </Field>
+              <Field label="Life years">
+                <input name="life_years" maxLength={40} placeholder="1948–2021 or Born 1985" />
+              </Field>
+            </div>
+            <Field label="Photograph link">
+              <input name="photo_url" type="url" placeholder="https://…" />
+            </Field>
+            <Field label="A short memory or note">
+              <textarea name="bio" maxLength={500} />
+            </Field>
+            <button className="primary">Add to family tree</button>
+          </form>
+        </aside>
+      )}
     </div>
   );
 }
