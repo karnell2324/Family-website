@@ -41,6 +41,48 @@ type FamilyMember = {
   generation: number;
 };
 
+type FootballData = {
+  updatedAt: string;
+  nfl: {
+    season: string;
+    conferences: Array<{
+      name: string;
+      abbreviation: string;
+      teams: Array<{
+        id: string;
+        name: string;
+        abbreviation: string;
+        logo: string | null;
+        wins: string;
+        losses: string;
+        ties: string;
+        pct: string;
+        streak: string;
+        differential: string;
+        seed: string;
+      }>;
+    }>;
+  };
+  college: {
+    polls: Array<{
+      name: string;
+      shortName: string;
+      teams: Array<{
+        id: string;
+        rank: number;
+        previous: number;
+        trend: string;
+        name: string;
+        abbreviation: string;
+        logo: string | null;
+        record: string;
+        points: number;
+        firstPlaceVotes: number;
+      }>;
+    }>;
+  };
+};
+
 const categories = ["news", "history", "photos", "learning", "events"];
 
 const sections = [
@@ -48,6 +90,7 @@ const sections = [
   ["news", "◈", "News"],
   ["history", "◷", "History"],
   ["family-tree", "♧", "Family Tree"],
+  ["football", "🏈", "Football"],
   ["photos", "▣", "Photos"],
   ["learning", "◇", "Learning"],
   ["events", "○", "Events"],
@@ -372,11 +415,15 @@ export default function FamilyApp() {
                       ? "Share something meaningful with the family. Every post is reviewed before it appears."
                       : view === "family-tree"
                         ? "See how our generations and family branches connect, and preserve the people behind our story."
+                        : view === "football"
+                          ? "Follow the NFL playoff race and the latest college football polls in one family scoreboard."
                         : `Approved ${heading.toLowerCase()} shared by our family.`}
               </p>
             </div>
 
-            {view !== "submit" && view !== "family-tree" && (
+            {view !== "submit" &&
+              view !== "family-tree" &&
+              view !== "football" && (
               <button
                 className="primary"
                 onClick={() => setView("submit")}
@@ -398,6 +445,8 @@ export default function FamilyApp() {
               addMember={addFamilyMember}
               removeMember={removeFamilyMember}
             />
+          ) : view === "football" ? (
+            <FootballHub />
           ) : view === "admin" && isAdmin ? (
             <Admin
               members={members}
@@ -416,6 +465,184 @@ export default function FamilyApp() {
         </main>
       </div>
     </div>
+  );
+}
+
+function FootballHub() {
+  const [mode, setMode] = useState<"nfl" | "college">("nfl");
+  const [data, setData] = useState<FootballData | null>(null);
+  const [selectedPoll, setSelectedPoll] = useState(0);
+  const [footballError, setFootballError] = useState("");
+
+  const loadFootball = useCallback(async () => {
+    setFootballError("");
+
+    try {
+      const response = await fetch("/api/football");
+      const payload = await response.json();
+
+      if (!response.ok) {
+        throw new Error(payload.error || "Football data is unavailable.");
+      }
+
+      setData(payload);
+    } catch (loadError) {
+      setFootballError(
+        loadError instanceof Error
+          ? loadError.message
+          : "Football data is unavailable.",
+      );
+    }
+  }, []);
+
+  useEffect(() => {
+    const loadTimer = window.setTimeout(() => {
+      void loadFootball();
+    }, 0);
+
+    return () => window.clearTimeout(loadTimer);
+  }, [loadFootball]);
+
+  if (!data && !footballError) {
+    return (
+      <section className="panel football-loading">
+        <div className="football-mark">🏈</div>
+        <h2>Loading the football board…</h2>
+        <p>Pulling the latest standings and rankings.</p>
+      </section>
+    );
+  }
+
+  if (!data) {
+    return (
+      <section className="panel football-loading">
+        <div className="football-mark">!</div>
+        <h2>Football data is temporarily unavailable</h2>
+        <p>{footballError}</p>
+        <button className="primary" onClick={loadFootball}>Try again</button>
+      </section>
+    );
+  }
+
+  const poll = data.college.polls[selectedPoll] || data.college.polls[0];
+
+  return (
+    <section className="football-hub">
+      <div className="football-toolbar panel">
+        <div className="football-switch" role="tablist" aria-label="Football leagues">
+          <button
+            role="tab"
+            aria-selected={mode === "nfl"}
+            className={mode === "nfl" ? "active" : ""}
+            onClick={() => setMode("nfl")}
+          >
+            NFL standings
+          </button>
+          <button
+            role="tab"
+            aria-selected={mode === "college"}
+            className={mode === "college" ? "active" : ""}
+            onClick={() => setMode("college")}
+          >
+            College rankings
+          </button>
+        </div>
+
+        <div className="football-updated">
+          <span className="live-dot" /> Updated {new Date(data.updatedAt).toLocaleString()}
+          <button className="refresh-scoreboard" onClick={loadFootball}>↻</button>
+        </div>
+      </div>
+
+      {mode === "nfl" ? (
+        <div className="conference-grid">
+          {data.nfl.conferences.map((conference) => (
+            <section className="panel standings-panel" key={conference.abbreviation}>
+              <div className="panel-head">
+                <div>
+                  <p className="eyebrow">{data.nfl.season} season</p>
+                  <h2>{conference.name}</h2>
+                </div>
+                <span className="pill">{conference.abbreviation}</span>
+              </div>
+              <div className="football-table-wrap">
+                <table className="football-table">
+                  <thead>
+                    <tr>
+                      <th>Seed</th><th>Team</th><th>W</th><th>L</th><th>T</th><th>PCT</th><th>DIFF</th><th>STRK</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {conference.teams.map((team) => (
+                      <tr key={team.id}>
+                        <td className="rank-cell">{team.seed}</td>
+                        <td>
+                          <div className="team-name">
+                            {team.logo && <img src={team.logo} alt="" />}
+                            <span><strong>{team.name}</strong><small>{team.abbreviation}</small></span>
+                          </div>
+                        </td>
+                        <td>{team.wins}</td><td>{team.losses}</td><td>{team.ties}</td><td>{team.pct}</td><td>{team.differential}</td><td>{team.streak}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          ))}
+        </div>
+      ) : (
+        <section className="panel rankings-panel">
+          <div className="rankings-heading">
+            <div>
+              <p className="eyebrow">National polls</p>
+              <h2>{poll?.name || "College football rankings"}</h2>
+            </div>
+            <div className="poll-picker" aria-label="Choose a college football poll">
+              {data.college.polls.map((item, index) => (
+                <button
+                  key={item.shortName}
+                  className={selectedPoll === index ? "active" : ""}
+                  onClick={() => setSelectedPoll(index)}
+                >
+                  {item.shortName}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {poll ? (
+            <div className="ranking-list">
+              {poll.teams.map((team) => {
+                const movement = team.previous
+                  ? team.previous - team.rank
+                  : 0;
+
+                return (
+                  <article className="ranking-row" key={team.id}>
+                    <div className="college-rank">{team.rank}</div>
+                    <div className="team-name college-team">
+                      {team.logo && <img src={team.logo} alt="" />}
+                      <span><strong>{team.name}</strong><small>{team.record}</small></span>
+                    </div>
+                    <div className={`rank-move ${movement > 0 ? "up" : movement < 0 ? "down" : ""}`}>
+                      {movement > 0 ? `↑ ${movement}` : movement < 0 ? `↓ ${Math.abs(movement)}` : "—"}
+                      <small>movement</small>
+                    </div>
+                    <div className="poll-points"><strong>{team.points.toLocaleString()}</strong><small>points</small></div>
+                    <div className="first-votes"><strong>{team.firstPlaceVotes}</strong><small>1st-place</small></div>
+                  </article>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="empty">No college rankings are available yet.</div>
+          )}
+        </section>
+      )}
+
+      <p className="football-source">Standings and rankings refresh automatically every 15 minutes. Data provided by ESPN.</p>
+    </section>
   );
 }
 
