@@ -41,10 +41,35 @@ type FamilyMember = {
   generation: number;
 };
 
+type FootballGame = {
+  id: string;
+  date: string;
+  detail: string;
+  venue: string;
+  broadcast: string;
+  away: FootballGameTeam;
+  home: FootballGameTeam;
+};
+
+type FootballGameTeam = {
+  id: string;
+  name: string;
+  abbreviation: string;
+  logo: string | null;
+  record: string;
+};
+
+type FootballVote = {
+  game_id: string;
+  user_id: string;
+  pick_team_id: string;
+};
+
 type FootballData = {
   updatedAt: string;
   nfl: {
     season: string;
+    games: FootballGame[];
     conferences: Array<{
       name: string;
       abbreviation: string;
@@ -64,6 +89,7 @@ type FootballData = {
     }>;
   };
   college: {
+    games: FootballGame[];
     polls: Array<{
       name: string;
       shortName: string;
@@ -446,7 +472,7 @@ export default function FamilyApp() {
               removeMember={removeFamilyMember}
             />
           ) : view === "football" ? (
-            <FootballHub />
+            <FootballHub userId={user.id} />
           ) : view === "admin" && isAdmin ? (
             <Admin
               members={members}
@@ -468,11 +494,23 @@ export default function FamilyApp() {
   );
 }
 
-function FootballHub() {
-  const [mode, setMode] = useState<"nfl" | "college">("nfl");
+function FootballHub({ userId }: { userId: string }) {
+  const [mode, setMode] = useState<"nfl" | "college" | "games">("nfl");
   const [data, setData] = useState<FootballData | null>(null);
   const [selectedPoll, setSelectedPoll] = useState(0);
+  const [gameLeague, setGameLeague] = useState<"nfl" | "college">("nfl");
+  const [votes, setVotes] = useState<FootballVote[]>([]);
+  const [votingGame, setVotingGame] = useState("");
   const [footballError, setFootballError] = useState("");
+
+  const loadVotes = useCallback(async () => {
+    const { data: voteData, error: voteError } = await supabase
+      .from("football_votes")
+      .select("game_id,user_id,pick_team_id");
+
+    if (voteError) throw voteError;
+    setVotes(voteData || []);
+  }, []);
 
   const loadFootball = useCallback(async () => {
     setFootballError("");
@@ -497,11 +535,28 @@ function FootballHub() {
 
   useEffect(() => {
     const loadTimer = window.setTimeout(() => {
-      void loadFootball();
+      void Promise.all([loadFootball(), loadVotes()]).catch((loadError) => {
+        setFootballError(
+          loadError instanceof Error ? loadError.message : "Football data is unavailable.",
+        );
+      });
     }, 0);
 
     return () => window.clearTimeout(loadTimer);
-  }, [loadFootball]);
+  }, [loadFootball, loadVotes]);
+
+  const castVote = async (gameId: string, teamId: string) => {
+    setVotingGame(gameId);
+    setFootballError("");
+    const { error: voteError } = await supabase.from("football_votes").upsert(
+      { game_id: gameId, user_id: userId, pick_team_id: teamId },
+      { onConflict: "game_id,user_id" },
+    );
+
+    if (voteError) setFootballError(voteError.message);
+    else await loadVotes();
+    setVotingGame("");
+  };
 
   if (!data && !footballError) {
     return (
@@ -525,6 +580,7 @@ function FootballHub() {
   }
 
   const poll = data.college.polls[selectedPoll] || data.college.polls[0];
+  const upcomingGames = gameLeague === "nfl" ? data.nfl.games : data.college.games;
 
   return (
     <section className="football-hub">
@@ -545,6 +601,14 @@ function FootballHub() {
             onClick={() => setMode("college")}
           >
             College rankings
+          </button>
+          <button
+            role="tab"
+            aria-selected={mode === "games"}
+            className={mode === "games" ? "active" : ""}
+            onClick={() => setMode("games")}
+          >
+            Game polls
           </button>
         </div>
 
@@ -591,7 +655,7 @@ function FootballHub() {
             </section>
           ))}
         </div>
-      ) : (
+      ) : mode === "college" ? (
         <section className="panel rankings-panel">
           <div className="rankings-heading">
             <div>
@@ -639,9 +703,91 @@ function FootballHub() {
             <div className="empty">No college rankings are available yet.</div>
           )}
         </section>
+      ) : (
+        <GamePolls
+          league={gameLeague}
+          setLeague={setGameLeague}
+          games={upcomingGames}
+          votes={votes}
+          userId={userId}
+          votingGame={votingGame}
+          castVote={castVote}
+        />
       )}
 
-      <p className="football-source">Standings and rankings refresh automatically every 15 minutes. Data provided by ESPN.</p>
+      <p className="football-source">Standings, rankings, and schedules refresh automatically every 15 minutes. Data provided by ESPN.</p>
+    </section>
+  );
+}
+
+function GamePolls({
+  league,
+  setLeague,
+  games,
+  votes,
+  userId,
+  votingGame,
+  castVote,
+}: {
+  league: "nfl" | "college";
+  setLeague: (league: "nfl" | "college") => void;
+  games: FootballGame[];
+  votes: FootballVote[];
+  userId: string;
+  votingGame: string;
+  castVote: (gameId: string, teamId: string) => Promise<void>;
+}) {
+  return (
+    <section className="panel game-polls-panel">
+      <div className="rankings-heading">
+        <div>
+          <p className="eyebrow">Family predictions</p>
+          <h2>Who wins the next game?</h2>
+        </div>
+        <div className="poll-picker" aria-label="Choose game league">
+          <button className={league === "nfl" ? "active" : ""} onClick={() => setLeague("nfl")}>NFL</button>
+          <button className={league === "college" ? "active" : ""} onClick={() => setLeague("college")}>College</button>
+        </div>
+      </div>
+
+      <div className="game-grid">
+        {games.map((game) => {
+          const gameVotes = votes.filter((vote) => vote.game_id === game.id);
+          const myVote = gameVotes.find((vote) => vote.user_id === userId)?.pick_team_id;
+          const total = gameVotes.length;
+          const count = (teamId: string) => gameVotes.filter((vote) => vote.pick_team_id === teamId).length;
+
+          return (
+            <article className="game-card" key={game.id}>
+              <div className="game-meta">
+                <strong>{new Date(game.date).toLocaleString([], { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</strong>
+                <span>{game.broadcast} · {game.venue}</span>
+              </div>
+              {[game.away, game.home].map((team) => {
+                const teamVotes = count(team.id);
+                const percent = total ? Math.round((teamVotes / total) * 100) : 0;
+                return (
+                  <button
+                    className={`game-pick ${myVote === team.id ? "selected" : ""}`}
+                    key={team.id}
+                    onClick={() => void castVote(game.id, team.id)}
+                    disabled={votingGame === game.id}
+                  >
+                    <span className="game-team">
+                      {team.logo && <img src={team.logo} alt="" />}
+                      <span><strong>{team.name}</strong><small>{team.record}</small></span>
+                    </span>
+                    <span className="vote-result"><strong>{percent}%</strong><small>{teamVotes} {teamVotes === 1 ? "vote" : "votes"}</small></span>
+                    <span className="vote-bar" style={{ width: `${percent}%` }} />
+                  </button>
+                );
+              })}
+              <p className="game-vote-note">{myVote ? "Your pick is saved. Choose the other team to change it." : `${total} family ${total === 1 ? "vote" : "votes"} so far.`}</p>
+            </article>
+          );
+        })}
+        {!games.length && <div className="empty">No upcoming {league === "nfl" ? "NFL" : "college"} games are listed yet.</div>}
+      </div>
     </section>
   );
 }
