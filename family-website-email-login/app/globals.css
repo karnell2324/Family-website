@@ -94,6 +94,51 @@ h1 { margin:8px 0 7px;font:700 clamp(32px,5vw,54px)/1.05 Georgia,serif;letter-sp
 .tree-form-panel h2 { margin-bottom:5px; }
 .tree-form-panel .help { margin:0 0 18px; }
 .form-pair { display:grid;grid-template-columns:1fr 1fr;gap:10px; }
+.football-hub { display:grid;gap:18px; }
+.football-toolbar { display:flex;align-items:center;justify-content:space-between;gap:18px;padding:13px; }
+.football-switch { display:flex;gap:4px;padding:4px;border-radius:12px;background:#edf1eb; }
+.football-switch button,.poll-picker button { border:0;border-radius:9px;padding:9px 13px;background:transparent;color:var(--muted);font-weight:700;cursor:pointer; }
+.football-switch button.active,.poll-picker button.active { background:var(--forest);color:white;box-shadow:0 5px 14px rgba(36,79,60,.18); }
+.football-updated { display:flex;align-items:center;gap:7px;color:var(--muted);font-size:12px; }
+.live-dot { width:7px;height:7px;border-radius:50%;background:#43a36f;box-shadow:0 0 0 4px rgba(67,163,111,.12); }
+.refresh-scoreboard { border:0;border-radius:50%;width:30px;height:30px;background:var(--sage);color:var(--forest);cursor:pointer;font-size:17px; }
+.conference-grid { display:grid;grid-template-columns:1fr 1fr;gap:18px;align-items:start; }
+.standings-panel { min-width:0; }
+.football-table-wrap { overflow-x:auto; }
+.football-table { width:100%;border-collapse:collapse;min-width:650px; }
+.football-table th { padding:9px 8px;border-bottom:1px solid var(--line);color:var(--muted);font-size:10px;letter-spacing:.08em;text-align:right;text-transform:uppercase; }
+.football-table th:nth-child(2) { text-align:left; }
+.football-table td { padding:9px 8px;border-bottom:1px solid #eceee9;text-align:right;font-size:12px;font-variant-numeric:tabular-nums; }
+.football-table tr:last-child td { border-bottom:0; }
+.football-table td:nth-child(2) { text-align:left; }
+.rank-cell { color:var(--gold);font-weight:800; }
+.team-name { display:flex;align-items:center;gap:9px;min-width:0; }
+.team-name img { width:30px;height:30px;object-fit:contain; }
+.team-name span { display:grid;min-width:0; }
+.team-name strong { overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px; }
+.team-name small { color:var(--muted);font-size:10px; }
+.rankings-panel { padding:0;overflow:hidden; }
+.rankings-heading { display:flex;justify-content:space-between;align-items:end;gap:22px;padding:23px;border-bottom:1px solid var(--line); }
+.rankings-heading h2 { margin-top:4px; }
+.poll-picker { display:flex;flex-wrap:wrap;justify-content:flex-end;gap:5px; }
+.poll-picker button { background:#edf1eb;font-size:11px; }
+.ranking-list { display:grid; }
+.ranking-row { display:grid;grid-template-columns:52px minmax(180px,1fr) 88px 76px 76px;align-items:center;gap:10px;padding:11px 22px;border-bottom:1px solid #eceee9; }
+.ranking-row:last-child { border-bottom:0; }
+.college-rank { color:var(--forest);font:700 23px Georgia,serif;text-align:center; }
+.college-team img { width:38px;height:38px; }
+.college-team strong { font-size:14px; }
+.rank-move,.poll-points,.first-votes { display:grid;text-align:center;color:#7a857d;font-size:12px;font-weight:700; }
+.rank-move small,.poll-points small,.first-votes small { color:var(--muted);font-size:9px;font-weight:400;text-transform:uppercase; }
+.rank-move.up { color:#2c8958; }
+.rank-move.down { color:#b14b3e; }
+.football-source { margin:0;text-align:right;color:var(--muted);font-size:11px; }
+.football-loading { min-height:360px;display:grid;place-items:center;align-content:center;text-align:center;gap:8px; }
+.football-loading h2,.football-loading p { margin:0; }
+.football-loading p { color:var(--muted); }
+.football-mark { display:grid;place-items:center;width:68px;height:68px;margin-bottom:8px;border-radius:50%;background:var(--sage);font-size:30px; }
 @media(max-width:820px){.layout{grid-template-columns:1fr}.sidebar{min-height:auto;border-right:0;border-bottom:1px solid var(--line);padding:10px 16px;overflow-x:auto}.nav-label{display:none}.nav{display:flex;min-width:max-content}.nav button{width:auto}.main{padding:26px 18px 48px}.hero{align-items:start;flex-direction:column}.grid{grid-template-columns:1fr}}
 @media(max-width:1050px){.tree-layout{grid-template-columns:1fr}.tree-form-panel{position:static}}
-@media(max-width:560px){.account span{display:none}.stats{grid-template-columns:1fr}.panel{padding:17px}.topbar{padding:12px 14px}.form-pair{grid-template-columns:1fr}.generation-row{grid-template-columns:1fr}.person-card{min-width:0}}
+@media(max-width:1050px){.conference-grid{grid-template-columns:1fr}}
+@media(max-width:720px){.football-toolbar,.rankings-heading{align-items:stretch;flex-direction:column}.football-updated{justify-content:space-between}.football-switch{width:100%}.football-switch button{flex:1}.poll-picker{justify-content:flex-start}.ranking-row{grid-template-columns:42px minmax(0,1fr) 65px}.poll-points,.first-votes{display:none}}
+@media(max-width:560px){.account span{display:none}.stats{grid-template-columns:1fr}.panel{padding:17px}.topbar{padding:12px 14px}.form-pair{grid-template-columns:1fr}.generation-row{grid-template-columns:1fr}.person-card{min-width:0}.football-toolbar{padding:10px}.rankings-panel{padding:0}.ranking-row{padding:10px 12px}.rankings-heading{padding:17px}}
